@@ -1,24 +1,31 @@
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+import matplotlib
+import pandas as pd
+import streamlit as st
+from fpdf import FPDF
+from typing import TypedDict, Optional
+from langgraph.graph import StateGraph, END
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_openai import ChatOpenAI
+from datetime import datetime
+import textwrap
+import json
+import base64
+import os
+import io
+import seaborn as sns
+import matplotlib.pyplot as plt
 from dotenv import load_dotenv
 load_dotenv()
+except ImportError:
+    pass
 
-import streamlit as st
-import pandas as pd
-import matplotlib
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import seaborn as sns
-import io
-import os
-import base64
-import json
-import textwrap
-from datetime import datetime
 
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, SystemMessage
-from langgraph.graph import StateGraph, END
-from typing import TypedDict, Optional
-from fpdf import FPDF
 
 # -- PAGE CONFIG ---------------------------------------------------------------
 st.set_page_config(
@@ -71,6 +78,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -- AGENT STATE ---------------------------------------------------------------
+
+
 class AgentState(TypedDict):
     df: object
     filename: str
@@ -87,6 +96,7 @@ class AgentState(TypedDict):
     log: list
 
 # -- TOOL FUNCTIONS ------------------------------------------------------------
+
 
 def tool_inspect_dataset(state: AgentState) -> AgentState:
     """Step 1 - Understand what the dataset is"""
@@ -120,7 +130,8 @@ def tool_statistical_analysis(state: AgentState) -> AgentState:
     log = state.get("log", [])
 
     numeric_cols = df.select_dtypes(include="number").columns.tolist()
-    cat_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
+    cat_cols = df.select_dtypes(
+        include=["object", "category"]).columns.tolist()
 
     lines = []
 
@@ -135,7 +146,8 @@ def tool_statistical_analysis(state: AgentState) -> AgentState:
             pairs = []
             for i in range(len(corr.columns)):
                 for j in range(i+1, len(corr.columns)):
-                    pairs.append((corr.columns[i], corr.columns[j], round(corr.iloc[i,j], 3)))
+                    pairs.append(
+                        (corr.columns[i], corr.columns[j], round(corr.iloc[i, j], 3)))
             pairs.sort(key=lambda x: abs(x[2]), reverse=True)
             for a, b, v in pairs[:5]:
                 lines.append(f"  {a} vs {b}: {v}")
@@ -148,7 +160,8 @@ def tool_statistical_analysis(state: AgentState) -> AgentState:
 
     missing = df.isnull().sum()
     missing = missing[missing > 0]
-    missing_info = missing.to_string() if len(missing) > 0 else "No missing values found."
+    missing_info = missing.to_string() if len(
+        missing) > 0 else "No missing values found."
 
     stats_summary = "\n".join(lines)
 
@@ -167,7 +180,8 @@ def tool_generate_charts(state: AgentState) -> AgentState:
     charts = []
 
     numeric_cols = df.select_dtypes(include="number").columns.tolist()
-    cat_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
+    cat_cols = df.select_dtypes(
+        include=["object", "category"]).columns.tolist()
 
     plt.style.use("seaborn-v0_8-whitegrid")
     colors = ["#1D4A2A", "#B8842A", "#2A6040", "#D4A855", "#4A7A5A"]
@@ -176,8 +190,10 @@ def tool_generate_charts(state: AgentState) -> AgentState:
     if numeric_cols:
         fig, ax = plt.subplots(figsize=(7, 4))
         col = numeric_cols[0]
-        df[col].dropna().hist(ax=ax, bins=30, color=colors[0], edgecolor="white", alpha=0.85)
-        ax.set_title(f"Distribution of {col}", fontsize=13, fontweight="bold", color="#1D4A2A")
+        df[col].dropna().hist(ax=ax, bins=30, color=colors[0],
+                              edgecolor="white", alpha=0.85)
+        ax.set_title(
+            f"Distribution of {col}", fontsize=13, fontweight="bold", color="#1D4A2A")
         ax.set_xlabel(col)
         ax.set_ylabel("Frequency")
         plt.tight_layout()
@@ -198,7 +214,8 @@ def tool_generate_charts(state: AgentState) -> AgentState:
             cmap="YlOrRd", linewidths=0.5,
             annot_kws={"size": 9}, mask=mask
         )
-        ax.set_title("Correlation Heatmap", fontsize=13, fontweight="bold", color="#1D4A2A")
+        ax.set_title("Correlation Heatmap", fontsize=13,
+                     fontweight="bold", color="#1D4A2A")
         plt.tight_layout()
         buf = io.BytesIO()
         fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
@@ -211,8 +228,10 @@ def tool_generate_charts(state: AgentState) -> AgentState:
         col = cat_cols[0]
         vc = df[col].value_counts().head(10)
         fig, ax = plt.subplots(figsize=(7, 4))
-        vc.plot(kind="bar", ax=ax, color=colors[1], edgecolor="white", alpha=0.9)
-        ax.set_title(f"Top Values - {col}", fontsize=13, fontweight="bold", color="#1D4A2A")
+        vc.plot(kind="bar", ax=ax,
+                color=colors[1], edgecolor="white", alpha=0.9)
+        ax.set_title(f"Top Values - {col}", fontsize=13,
+                     fontweight="bold", color="#1D4A2A")
         ax.set_xlabel(col)
         ax.set_ylabel("Count")
         plt.xticks(rotation=45, ha="right")
@@ -229,14 +248,16 @@ def tool_generate_charts(state: AgentState) -> AgentState:
     if len(missing) > 0:
         fig, ax = plt.subplots(figsize=(7, 3))
         missing.plot(kind="bar", ax=ax, color="#B03A2E", edgecolor="white")
-        ax.set_title("Missing Values per Column", fontsize=13, fontweight="bold", color="#1D4A2A")
+        ax.set_title("Missing Values per Column", fontsize=13,
+                     fontweight="bold", color="#1D4A2A")
         ax.set_ylabel("Count")
         plt.xticks(rotation=45, ha="right")
         plt.tight_layout()
         buf = io.BytesIO()
         fig.savefig(buf, format="png", dpi=150, bbox_inches="tight")
         buf.seek(0)
-        charts.append({"title": "Missing Values per Column", "img": buf.read()})
+        charts.append(
+            {"title": "Missing Values per Column", "img": buf.read()})
         plt.close(fig)
 
     log.append({
@@ -280,7 +301,8 @@ Respond ONLY with a valid JSON object (no markdown, no backticks) with exactly t
 }}"""
 
     response = llm.invoke([
-        SystemMessage(content="You are an expert data analyst. Always respond with valid JSON only."),
+        SystemMessage(
+            content="You are an expert data analyst. Always respond with valid JSON only."),
         HumanMessage(content=prompt)
     ])
 
@@ -294,9 +316,11 @@ Respond ONLY with a valid JSON object (no markdown, no backticks) with exactly t
 
     result = json.loads(raw)
 
-    pattern_insights = "\n".join([f"- {p}" for p in result.get("key_patterns", [])])
+    pattern_insights = "\n".join(
+        [f"- {p}" for p in result.get("key_patterns", [])])
     executive_summary = result.get("executive_summary", "")
-    recommendations = "\n".join([f"- {r}" for r in result.get("recommendations", [])])
+    recommendations = "\n".join(
+        [f"- {r}" for r in result.get("recommendations", [])])
     dataset_description = result.get("dataset_description", "")
 
     log.append({
@@ -330,7 +354,8 @@ def tool_generate_pdf(state: AgentState) -> AgentState:
     pdf.cell(180, 10, "DATASET ANALYSIS REPORT", ln=True, align="C")
     pdf.set_font("Helvetica", "", 11)
     pdf.set_xy(15, 20)
-    pdf.cell(180, 8, f"File: {state['filename']}   |   Generated: {datetime.now().strftime('%B %d, %Y %H:%M')}", ln=True, align="C")
+    pdf.cell(
+        180, 8, f"File: {state['filename']}   |   Generated: {datetime.now().strftime('%B %d, %Y %H:%M')}", ln=True, align="C")
     pdf.set_xy(15, 30)
     pdf.cell(180, 6, state["shape_info"], ln=True, align="C")
 
@@ -481,7 +506,8 @@ if uploaded_file and api_key:
     col_a, col_b, col_c, col_d = st.columns(4)
     col_a.metric("Rows", f"{df.shape[0]:,}")
     col_b.metric("Columns", df.shape[1])
-    col_c.metric("Numeric Cols", len(df.select_dtypes(include="number").columns))
+    col_c.metric("Numeric Cols", len(
+        df.select_dtypes(include="number").columns))
     col_d.metric("Missing Values", int(df.isnull().sum().sum()))
 
     st.markdown("---")
@@ -552,7 +578,8 @@ if uploaded_file and api_key:
             st.markdown("---")
             st.markdown("### 📊 Results")
 
-            tab1, tab2, tab3, tab4 = st.tabs(["Executive Summary", "Key Patterns", "Charts", "Recommendations"])
+            tab1, tab2, tab3, tab4 = st.tabs(
+                ["Executive Summary", "Key Patterns", "Charts", "Recommendations"])
 
             with tab1:
                 st.markdown(f"""
@@ -570,7 +597,8 @@ if uploaded_file and api_key:
                 chart_cols = st.columns(2)
                 for i, chart in enumerate(final_state.get("charts", [])):
                     with chart_cols[i % 2]:
-                        st.image(chart["img"], caption=chart["title"], use_container_width=True)
+                        st.image(chart["img"], caption=chart["title"],
+                                 use_container_width=True)
 
             with tab4:
                 for line in final_state["recommendations"].split("\n"):
@@ -584,7 +612,7 @@ if uploaded_file and api_key:
                 st.download_button(
                     label="📥 Download Full PDF Report",
                     data=bytes(pdf_bytes),
-                    file_name=f"analysis_{uploaded_file.name.replace('.csv','')}.pdf",
+                    file_name=f"analysis_{uploaded_file.name.replace('.csv', '')}.pdf",
                     mime="application/pdf",
                     use_container_width=True,
                     type="primary"
