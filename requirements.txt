@@ -1,0 +1,9 @@
+streamlit>=1.32.0
+langchain>=0.2.0
+langchain-openai>=0.1.0
+langgraph>=0.1.0
+pandas>=2.0.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+fpdf2>=2.7.0
+openai>=1.0.0
