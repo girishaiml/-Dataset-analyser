@@ -19,11 +19,6 @@ import os
 import io
 import seaborn as sns
 import matplotlib.pyplot as plt
-from dotenv import load_dotenv
-load_dotenv()
-except ImportError:
-    pass
-
 matplotlib.use("Agg")
 
 
